@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Automator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.17/mammoth.browser.min.js"></script>
+    <style>
+        .file-input-label { transition: all 0.3s ease; }
+        .file-input-label:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); }
+        .preview-card { transition: all 0.2s ease; }
+        .preview-card:hover { transform: translateY(-3px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); }
+        .email-toggle { width: 1.25rem; height: 1.25rem; }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .preview-card .email-body-content ul,
+        .preview-card .email-body-content ol {
+            margin-left: 1.5em; 
+            padding-left: 1em;  
+        }
+        .preview-card .email-body-content ul {
+            list-style-type: disc; 
+        }
+        .preview-card .email-body-content ol {
+            list-style-type: decimal; 
+        }
+        .preview-card .email-body-content li {
+            margin-bottom: 0.25em; 
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-blue-600 mb-2">Email Automator</h1>
+            <p class="text-gray-600 text-lg">Create and send personalized emails effortlessly</p>
+            <div class="w-24 h-1 bg-blue-400 mx-auto mt-4 rounded-full"></div>
+        </header>
+        <main>
+            <section class="bg-white rounded-xl shadow-md p-6 mb-8">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-cloud-upload-alt text-blue-500 mr-3"></i> Upload Your Files
+                </h2>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Excel Data File <span class="text-red-500">*</span></label>
+                        <label for="excel-file" class="file-input-label flex flex-col items-center justify-center w-full h-40 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                            <i class="fas fa-file-excel text-4xl text-green-600 mb-3"></i>
+                            <p class="text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag & drop</p>
+                            <p class="text-xs text-gray-500">.xlsx, .xls, .csv</p>
+                            <input id="excel-file" type="file" class="hidden" accept=".xlsx,.xls,.csv" />
+                        </label>
+                        <div id="excel-file-name" class="mt-2 text-sm text-gray-500"></div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Email Template <span class="text-red-500">*</span></label>
+                        <label for="template-file" class="file-input-label flex flex-col items-center justify-center w-full h-40 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                            <i class="fas fa-file-word text-4xl text-blue-600 mb-3"></i>
+                            <p class="text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag & drop</p>
+                            <p class="text-xs text-gray-500">.txt, .html, .docx</p>
+                            <input id="template-file" type="file" class="hidden" accept=".txt,.html,.htm,.docx" />
+                        </label>
+                        <div id="template-file-name" class="mt-2 text-sm text-gray-500"></div>
+                    </div>
+                </div>
+                <div id="email-column-section" class="mt-6 hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Email Column <span class="text-red-500">*</span></label>
+                    <select id="email-column" class="w-full border border-gray-300 rounded p-2"></select>
+                </div>
+                <div class="mt-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Email Subject <span class="text-red-500">*</span></label>
+                    <input id="email-subject" type="text" class="w-full border border-gray-300 rounded p-2" placeholder="Subject" />
+                </div>
+                <div class="mt-8 text-center">
+                    <button id="process-btn" class="bg-blue-600 text-white px-6 py-3 rounded disabled:opacity-50" disabled>Process Files</button>
+                </div>
+            </section>
+            <section id="preview-section" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 flex items-center"><i class="fas fa-eye text-blue-500 mr-3"></i> Previews</h2>
+                    <div class="flex items-center">
+                        <span class="mr-2 text-sm">Select All</span>
+                        <input id="select-all-toggle" type="checkbox" class="mr-4 h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <button id="send-selected-btn" class="bg-green-600 text-white px-4 py-2 rounded">Send Selected</button>
+                    </div>
+                </div>
+                 <p class="text-sm text-gray-600 mb-4">
+                    <i class="fas fa-info-circle mr-1"></i> Note: This tool will first attempt to open Microsoft Outlook. If Outlook fails to open (e.g., "action not supported"), it will try your system's default email client. The email body will be plain text for maximum compatibility. Check browser console for details.
+                </p>
+                <div id="preview-container" class="grid md:grid-cols-2 gap-6 mb-8"></div>
+                <div class="text-center">
+                    <button id="send-all-btn" class="bg-green-600 text-white px-6 py-3 rounded">Send All (Processed)</button>
+                </div>
+            </section>
+            <div id="progress-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+                <div class="bg-white rounded p-6 w-96">
+                    <h3 class="mb-4 text-lg font-semibold flex items-center"><i class="fas fa-spinner fa-spin mr-2"></i>Processing Emails...</h3>
+                    <div class="w-full bg-gray-200 rounded h-2 mb-4"><div id="progress-bar" class="h-2 bg-blue-600 w-0 transition-all duration-300 ease-linear"></div></div>
+                    <p id="progress-text" class="text-sm text-center">0%</p>
+                    <p id="progress-count" class="text-sm text-center">0/0</p>
+                </div>
+            </div>
+            <div id="success-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+                <div class="bg-white rounded p-6 w-96 text-center">
+                    <i class="fas fa-check-circle text-green-600 text-4xl mb-4"></i>
+                    <h3 class="text-lg font-semibold mb-2">Process Complete!</h3>
+                    <p id="success-message" class="mb-4 text-gray-700"></p>
+                    <button id="close-success-modal" class="bg-blue-600 text-white px-4 py-2 rounded">Done</button>
+                </div>
+            </div>
+        </main>
+        <footer class="text-center py-4 text-gray-500">Email Automator © 2025</footer>
+    </div>
+    <script>
+        const excelFileInput = document.getElementById('excel-file');
+        const templateFileInput = document.getElementById('template-file');
+        const excelFileName = document.getElementById('excel-file-name');
+        const templateFileName = document.getElementById('template-file-name');
+        const emailColumnSection = document.getElementById('email-column-section');
+        const emailColumnSelect = document.getElementById('email-column');
+        const emailSubjectInput = document.getElementById('email-subject');
+        const processBtn = document.getElementById('process-btn');
+        const previewSection = document.getElementById('preview-section');
+        const previewContainer = document.getElementById('preview-container');
+        const selectAllToggle = document.getElementById('select-all-toggle');
+        const sendSelectedBtn = document.getElementById('send-selected-btn');
+        const sendAllBtn = document.getElementById('send-all-btn');
+        const progressModal = document.getElementById('progress-modal');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const progressCount = document.getElementById('progress-count');
+        const successModal = document.getElementById('success-modal');
+        const successMessage = document.getElementById('success-message');
+        const closeSuccessModal = document.getElementById('close-success-modal');
+
+        let excelData = [], templateContent = '', processedEmails = [];
+
+        excelFileInput.addEventListener('change', handleExcelFileUpload);
+        templateFileInput.addEventListener('change', handleTemplateFileUpload);
+        emailColumnSelect.addEventListener('change', updateProcessButtonState);
+        emailSubjectInput.addEventListener('input', updateProcessButtonState);
+        processBtn.addEventListener('click', processFiles);
+        selectAllToggle.addEventListener('change', toggleSelectAllEmails);
+        
+        sendSelectedBtn.addEventListener('click', () => {
+            const selected = processedEmails.filter(m => m.selected);
+            if (selected.length === 0) {
+                showError('No emails are selected to send.');
+                return;
+            }
+            sendBatch(selected);
+        });
+        
+        sendAllBtn.addEventListener('click', () => {
+            if (processedEmails.length === 0) {
+                showError('No emails have been processed yet to send.');
+                return;
+            }
+            sendBatch(processedEmails); 
+        });
+
+        closeSuccessModal.addEventListener('click', () => successModal.classList.add('hidden'));
+
+        function handleExcelFileUpload(e) {
+            const file = e.target.files[0]; if (!file) return;
+            excelFileName.textContent = `Selected: ${file.name}`;
+            const reader = new FileReader();
+            reader.onload = evt => {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const wb = XLSX.read(data, { type: 'array' });
+                    const sheet = wb.Sheets[wb.SheetNames[0]];
+                    excelData = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+                    if (excelData.length && excelData[0] && excelData[0].length) {
+                        emailColumnSelect.innerHTML = '<option value="">-- Select Email Column --</option>';
+                        excelData[0].forEach((col, i) => {
+                            if (col != null) emailColumnSelect.append(new Option(String(col), i));
+                        });
+                        emailColumnSection.classList.remove('hidden');
+                    } else {
+                         excelData = [];
+                         emailColumnSelect.innerHTML = '<option value="">-- Select Email Column --</option>';
+                         emailColumnSection.classList.add('hidden');
+                         showError("Excel file is empty or header row not found.");
+                    }
+                    updateProcessButtonState();
+                } catch (err) {
+                    showError("Error reading Excel file: " + err.message);
+                    excelFileName.textContent = '';
+                    excelData = [];
+                    updateProcessButtonState();
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function handleTemplateFileUpload(e) {
+            const file = e.target.files[0]; if (!file) return;
+            templateFileName.textContent = `Selected: ${file.name}`;
+            templateContent = ''; 
+            const ext = file.name.split('.').pop().toLowerCase();
+            const rdr = new FileReader();
+            if (ext === 'docx') {
+                rdr.onload = evt => {
+                    mammoth.convertToHtml({ arrayBuffer: evt.target.result })
+                        .then(res => {
+                            templateContent = res.value; // This is HTML
+                            updateProcessButtonState();
+                        })
+                        .catch(err => {
+                            showError('DOCX conversion failed: ' + (err.message || JSON.stringify(err)));
+                            templateFileName.textContent = '';
+                            updateProcessButtonState();
+                        });
+                };
+                rdr.readAsArrayBuffer(file);
+            } else { // .txt, .html, .htm
+                rdr.onload = evt => { 
+                    templateContent = evt.target.result; // Could be plain text or HTML
+                    updateProcessButtonState();
+                };
+                rdr.readAsText(file);
+            }
+        }
+        
+        function updateProcessButtonState() {
+            const excelFileReady = excelData.length > 0;
+            const templateFileReady = templateContent.length > 0;
+            const emailColumnSelected = emailColumnSelect.value !== "";
+            const subjectEntered = emailSubjectInput.value.trim() !== "";
+            processBtn.disabled = !(excelFileReady && templateFileReady && emailColumnSelected && subjectEntered);
+        }
+
+        function processFiles() {
+            if (excelData.length < 1 || !excelData[0]) return showError('Excel data is missing headers.');
+            if (excelData.length < 2) return showError('Excel data has no content rows (only header or empty).');
+            
+            const colIdx = +emailColumnSelect.value;
+            const subj = emailSubjectInput.value.trim();
+            processedEmails = [];
+            const headers = excelData[0];
+
+            excelData.slice(1).forEach(row => {
+                if (!row || row.length === 0) return; 
+                const emailAddress = row[colIdx] ? String(row[colIdx]).trim() : null;
+                if (!emailAddress || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress)) { 
+                    console.warn(`Skipping invalid or missing email address: '${emailAddress}' in row: ${row.join(', ')}`);
+                    return; 
+                }
+                
+                let currentEmailBodyContent = templateContent; // This is HTML if from .docx or .html
+                headers.forEach((header, i) => { 
+                    if (header != null && String(header).trim() !== '') {
+                        const placeholderValue = (row[i] != null) ? String(row[i]) : '';
+                        const escapedHeader = String(header).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        currentEmailBodyContent = currentEmailBodyContent.replace(new RegExp(`\\{${escapedHeader}\\}`, 'g'), placeholderValue); 
+                    }
+                });
+                // Store the (potentially HTML) content. Conversion to plain text happens in sendViaOutlook.
+                processedEmails.push({ email: emailAddress, subject: subj, content: currentEmailBodyContent, selected: true });
+            });
+
+            if (!processedEmails.length) {
+                showError('No valid email addresses found or no rows to process after filtering.');
+                previewSection.classList.add('hidden');
+                return;
+            }
+            renderPreviews();
+            previewSection.classList.remove('hidden');
+            selectAllToggle.checked = true; 
+            selectAllToggle.indeterminate = false;
+        }
+
+        function renderPreviews() {
+            previewContainer.innerHTML = '';
+            processedEmails.forEach((mail, idx) => {
+                const card = document.createElement('div'); 
+                card.className = 'preview-card bg-white rounded shadow p-4 fade-in';
+                card.style.animationDelay = `${idx*0.05}s`;
+                
+                // The preview card will show the HTML content as rendered by the browser
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="font-semibold text-gray-800 break-all">${mail.email}</div>
+                        <input type="checkbox" class="email-toggle h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${mail.selected ? 'checked' : ''} data-idx="${idx}" />
+                    </div>
+                    <small class="text-gray-600 block mb-1">${mail.subject}</small>
+                    <div class="mb-2 text-sm email-body-content border border-gray-200 p-2 rounded" style="overflow-wrap: break-word; max-height: 150px; overflow-y: auto;">${mail.content}</div>
+                    <button class="send-single-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm" data-idx="${idx}">Send This</button>
+                `;
+                previewContainer.appendChild(card);
+                card.querySelector('.email-toggle').addEventListener('change', e => toggleEmail(idx, e.target.checked));
+                card.querySelector('.send-single-btn').addEventListener('click', () => sendSingle(idx));
+            });
+            updateSelectAllToggleState();
+        }
+        
+        function updateSelectAllToggleState() {
+            const numSelected = processedEmails.filter(m => m.selected).length;
+            const totalEmails = processedEmails.length;
+
+            if (totalEmails === 0) {
+                selectAllToggle.checked = false;
+                selectAllToggle.indeterminate = false;
+            } else {
+                selectAllToggle.checked = numSelected === totalEmails;
+                selectAllToggle.indeterminate = numSelected > 0 && numSelected < totalEmails;
+            }
+        }
+
+        function toggleEmail(idx, state) {
+            if (processedEmails[idx]) {
+                processedEmails[idx].selected = state;
+            }
+            updateSelectAllToggleState();
+        }
+
+        function toggleSelectAllEmails() {
+            const allSelected = selectAllToggle.checked;
+            processedEmails.forEach(m => m.selected = allSelected);
+            
+            const checkboxes = previewContainer.querySelectorAll('.email-toggle');
+            checkboxes.forEach(cb => cb.checked = allSelected);
+            
+            selectAllToggle.indeterminate = false; 
+        }
+
+        function sendSingle(i) { 
+            if (processedEmails[i]) {
+                sendBatch([processedEmails[i]]); 
+            }
+        }
+
+        function sendBatch(list) {
+            if (!list || list.length === 0) {
+                showError('No emails to send in the batch.');
+                return;
+            }
+            progressModal.classList.remove('hidden');
+            let successCount = 0;
+            let failureCount = 0;
+            const totalToProcess = list.length;
+            let currentIndex = 0;
+
+            function updateProgressUI() {
+                const processedCount = currentIndex;
+                const pct = totalToProcess > 0 ? Math.floor((processedCount / totalToProcess) * 100) : 0;
+                progressBar.style.width = `${pct}%`;
+                progressText.textContent = `${pct}%`;
+                progressCount.textContent = `${processedCount}/${totalToProcess} (Dispatched: ${successCount}, Failed: ${failureCount})`;
+            }
+            
+            progressBar.style.width = `0%`;
+            updateProgressUI(); 
+
+            function processNextEmail() {
+                if (currentIndex >= totalToProcess) {
+                    setTimeout(() => {
+                        progressModal.classList.add('hidden');
+                        let message = `Attempted to dispatch ${successCount} email(s) out of ${totalToProcess}.`;
+                        if (failureCount > 0) {
+                            message += ` ${failureCount} email(s) failed to dispatch successfully even with fallbacks.`;
+                        }
+                        message += ` If Outlook showed an error like "action not supported" or didn't open for dispatched emails, please verify your Outlook installation and 'ms-outlook:' protocol configuration. If Outlook failed, a fallback to your default mail client was attempted. The email body is sent as plain text for maximum compatibility. Check the browser console for detailed logs.`;
+                        successMessage.textContent = message;
+                        successModal.classList.remove('hidden');
+                    }, 500);
+                    return;
+                }
+
+                const mail = list[currentIndex];
+                // mail.content is HTML here. sendViaOutlook will convert it to plain text for protocol links.
+                sendViaOutlook(mail.email, mail.subject, mail.content) 
+                    .then((methodUsed) => {
+                        successCount++;
+                        console.log(`[sendBatch] Successfully dispatched email for ${mail.email} using ${methodUsed}.`);
+                    })
+                    .catch(e => {
+                        failureCount++;
+                        console.error(`[sendBatch] All attempts failed for ${mail.email}:`, e.message || e);
+                    })
+                    .finally(() => {
+                        currentIndex++;
+                        updateProgressUI();
+                        setTimeout(processNextEmail, 350); 
+                    });
+            }
+            processNextEmail();
+        }
+
+        function htmlToPlainText(html) {
+            try {
+                let tempDiv = document.createElement("div");
+                const cleanHtml = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+                                      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "");
+                tempDiv.innerHTML = cleanHtml;
+
+                // Process bold/strong elements - convert to **text** format
+                tempDiv.querySelectorAll('b, strong').forEach(bold => {
+                    const text = bold.textContent || bold.innerText || '';
+                    if (text.trim()) {
+                        bold.outerHTML = `**${text}**`;
+                    }
+                });
+
+                // Process italic elements - convert to *text* format
+                tempDiv.querySelectorAll('i, em').forEach(italic => {
+                    const text = italic.textContent || italic.innerText || '';
+                    if (text.trim()) {
+                        italic.outerHTML = `*${text}*`;
+                    }
+                });
+
+                // Process unordered lists with proper indentation
+                tempDiv.querySelectorAll('ul').forEach(ul => {
+                    const listItems = ul.querySelectorAll('li');
+                    listItems.forEach((li, index) => {
+                        const text = li.textContent || li.innerText || '';
+                        if (text.trim()) {
+                            // Add proper spacing: bullet + space + content + newline
+                            li.outerHTML = `  • ${text.trim()}\n`;
+                        }
+                    });
+                    // Add extra line break after the list
+                    ul.outerHTML = ul.innerHTML + '\n';
+                });
+
+                // Process ordered lists with proper indentation  
+                tempDiv.querySelectorAll('ol').forEach(ol => {
+                    const listItems = ol.querySelectorAll('li');
+                    listItems.forEach((li, index) => {
+                        const text = li.textContent || li.innerText || '';
+                        if (text.trim()) {
+                            // Add proper spacing: number + period + space + content + newline
+                            li.outerHTML = `  ${index + 1}. ${text.trim()}\n`;
+                        }
+                    });
+                    // Add extra line break after the list
+                    ol.outerHTML = ol.innerHTML + '\n';
+                });
+
+                // Process paragraphs
+                tempDiv.querySelectorAll('p').forEach(p => {
+                    const text = p.textContent || p.innerText || '';
+                    if (text.trim()) {
+                        p.outerHTML = text.trim() + '\n\n';
+                    }
+                });
+
+                // Process line breaks
+                tempDiv.querySelectorAll('br').forEach(br => {
+                    br.outerHTML = '\n';
+                });
+
+                // Process headings
+                tempDiv.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(h => {
+                    const text = h.textContent || h.innerText || '';
+                    if (text.trim()) {
+                        h.outerHTML = '\n' + text.trim().toUpperCase() + '\n\n';
+                    }
+                });
+
+                // Process links
+                tempDiv.querySelectorAll('a[href]').forEach(a => {
+                    const href = a.getAttribute('href');
+                    const text = a.textContent || a.innerText || '';
+                    if (text.trim() !== href) {
+                        a.outerHTML = `${text} (${href})`;
+                    } else {
+                        a.outerHTML = href;
+                    }
+                });
+
+                let text = tempDiv.textContent || tempDiv.innerText || "";
+                
+                // Clean up excessive whitespace while preserving intentional formatting
+                text = text.replace(/[ \t]+/g, ' '); // Multiple spaces/tabs to single space
+                text = text.replace(/\n[ \t]+/g, '\n'); // Remove spaces/tabs at start of lines
+                text = text.replace(/[ \t]+\n/g, '\n'); // Remove spaces/tabs at end of lines
+                text = text.replace(/\n{3,}/g, '\n\n'); // Multiple newlines to double newlines max
+                text = text.replace(/^\s+|\s+$/g, ''); // Trim start and end
+                
+                return text;
+            } catch (e) {
+                console.error("Error converting HTML to plain text:", e);
+                const fallbackDiv = document.createElement("div");
+                fallbackDiv.innerHTML = html;
+                return fallbackDiv.textContent || fallbackDiv.innerText || "";
+            }
+        }
+
+        async function sendViaOutlook(to, subj, htmlBodyContent) { // Renamed 'body' to 'htmlBodyContent' for clarity
+            // Method 1: ActiveX (IE/COM based Outlook) - Can use HTML
+            if (typeof ActiveXObject !== 'undefined' && (window.ActiveXObject || "ActiveXObject" in window)) {
+                try {
+                    console.info("[sendViaOutlook] Attempting ActiveX Outlook...");
+                    const outlookApp = new ActiveXObject('Outlook.Application');
+                    const mailItem = outlookApp.CreateItem(0);
+                    mailItem.To = to;
+                    mailItem.Subject = subj;
+                    mailItem.HTMLBody = htmlBodyContent; // Use original HTML content
+                    mailItem.Display();
+                    console.info("[sendViaOutlook] ActiveX Outlook Display() called successfully.");
+                    return Promise.resolve("ActiveX");
+                } catch (e) {
+                    console.warn("[sendViaOutlook] ActiveX Outlook method failed. Trying other methods.", e.message || e);
+                }
+            }
+
+            // Method 2: Office.js (Office Add-ins) - Can use HTML
+            if (window.Office && Office.context && Office.context.mailbox) {
+                try {
+                    console.info("[sendViaOutlook] Attempting Office.js Outlook...");
+                    Office.context.mailbox.displayNewMessageForm({
+                        toRecipients: [to],
+                        subject: subj,
+                        htmlBody: htmlBodyContent // Use original HTML content
+                    });
+                    console.info("[sendViaOutlook] Office.js displayNewMessageForm() called successfully.");
+                    return Promise.resolve("Office.js");
+                } catch (e) {
+                    console.warn("[sendViaOutlook] Office.js method failed. Trying ms-outlook scheme.", e.message || e);
+                }
+            }
+
+            // For ms-outlook and mailto, convert the HTML content to plain text.
+            const plainTextForProtocols = htmlToPlainText(htmlBodyContent);
+            const safeSubj = subj || "";
+            const safePlainTextBody = plainTextForProtocols || "";
+
+            // Method 3: ms-outlook: scheme - Uses PLAIN TEXT
+            console.info(`[sendViaOutlook] Attempting ms-outlook: scheme for ${to}...`);
+            const outlookLink = `ms-outlook:compose?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(safeSubj)}&body=${encodeURIComponent(safePlainTextBody)}`;
+
+            console.log(`[sendViaOutlook] Generated ms-outlook link (length: ${outlookLink.length}). For manual testing, copy and paste the following line into your browser address bar or OS 'Run' dialog:`);
+            console.log(outlookLink);
+
+            const MAX_MS_OUTLOOK_URL_LENGTH = 2048;
+            if (outlookLink.length > MAX_MS_OUTLOOK_URL_LENGTH) {
+                console.warn(`[sendViaOutlook] ms-outlook link for ${to} is long (${outlookLink.length} chars).`);
+            }
+
+            try {
+                const mailWindow = window.open(outlookLink);
+                if (!mailWindow && navigator.userAgent.toLowerCase().indexOf('firefox') === -1) { 
+                    throw new Error("window.open() for ms-outlook returned falsy (and not Firefox).");
+                }
+                console.info(`[sendViaOutlook] ms-outlook: link for ${to} dispatched. OS will handle if configured.`);
+                await new Promise(r => setTimeout(r, 100)); 
+                return Promise.resolve("ms-outlook");
+
+            } catch (e) {
+                console.warn(`[sendViaOutlook] ms-outlook: scheme failed for ${to}: ${e.message}. Attempting mailto: fallback.`);
+                
+                // Method 4: mailto: fallback - Uses PLAIN TEXT
+                console.info(`[sendViaOutlook] Attempting mailto: fallback for ${to}...`);
+                let mailtoLink = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(safeSubj)}&body=${encodeURIComponent(safePlainTextBody)}`;
+                
+                const MAX_MAILTO_LENGTH = 2000;
+                if (mailtoLink.length > MAX_MAILTO_LENGTH) {
+                    console.warn(`[sendViaOutlook] mailto: link for ${to} is long (${mailtoLink.length} chars). May cause issues.`);
+                    if (mailtoLink.length > 8000) { // Arbitrary very high limit
+                         return Promise.reject(new Error(`Mailto link for ${to} is too long (${mailtoLink.length} chars) and will likely fail.`));
+                    }
+                }
+
+                try {
+                    const mailtoWindow = window.open(mailtoLink);
+                    if (!mailtoWindow && navigator.userAgent.toLowerCase().indexOf('firefox') === -1) {
+                         console.warn(`[sendViaOutlook] window.open() for mailto:${to} returned falsy. Email client might not have opened (could be popup blocker).`);
+                    }
+                    console.info(`[sendViaOutlook] mailto: link for ${to} dispatched.`);
+                    return Promise.resolve("mailto");
+                } catch (e2) {
+                    console.error(`[sendViaOutlook] All attempts failed for ${to}. ms-outlook error: ${e.message || e}. mailto error: ${e2.message || e2}`);
+                    return Promise.reject(new Error(`All mail client opening attempts failed for ${to}. Original ms-outlook error: ${e.message}. Fallback mailto error: ${e2.message}`));
+                }
+            }
+        }
+
+        function showError(msg) { 
+            console.error("Error:", msg); 
+            alert(`Error: ${msg}`); 
+        }
+
+        updateSelectAllToggleState();
+    </script>
+</body>
+</html>
